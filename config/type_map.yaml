@@ -1,0 +1,172 @@
+# SQL Server -> PostgreSQL Compatible Data Type Matrix
+#
+# Structure per normalized SQL Server base type:
+#   compatible: PostgreSQL target types considered semantically equivalent (PASS)
+#   warn:       PostgreSQL target types that are acceptable with caveats/lossiness (WARN)
+#   note:       DBA guidance included in drift reports when WARN or FAIL triggers
+#
+# All type names are matched case-insensitively after stripping length/precision
+# modifiers (precision/scale/length checks are enforced separately in structure.py).
+
+version: "1.0"
+
+types:
+  bigint:
+    compatible: ["bigint", "int8"]
+    warn: ["numeric", "decimal"]
+    note: "Map bigint to PostgreSQL bigint (int8). Avoid numeric unless arbitrary precision is explicitly required."
+
+  int:
+    compatible: ["integer", "int4", "int", "bigint", "int8"]
+    warn: ["numeric", "decimal"]
+    note: "Map int to integer (int4) or widen to bigint (int8). Narrowing to smallint risks overflow."
+
+  smallint:
+    compatible: ["smallint", "int2", "integer", "int4", "int", "bigint", "int8"]
+    warn: []
+    note: "Map smallint to smallint (int2) or wider integer type."
+
+  tinyint:
+    compatible: ["smallint", "int2", "integer", "int4", "int", "bigint", "int8"]
+    warn: ["boolean", "bool"]
+    note: "SQL Server tinyint is unsigned 0..255; PostgreSQL lacks unsigned 1-byte int, so smallint (int2) is standard."
+
+  bit:
+    compatible: ["boolean", "bool"]
+    warn: ["smallint", "int2"]
+    note: "Map SQL Server bit to PostgreSQL boolean."
+
+  decimal:
+    compatible: ["numeric", "decimal"]
+    warn: ["double precision", "float8"]
+    note: "Preserve exact fixed-point arithmetic using numeric(p,s); floating-point types introduce rounding drift."
+
+  numeric:
+    compatible: ["numeric", "decimal"]
+    warn: ["double precision", "float8"]
+    note: "Preserve exact fixed-point arithmetic using numeric(p,s)."
+
+  money:
+    compatible: ["numeric", "decimal"]
+    warn: ["money"]
+    note: "Prefer numeric(19,4) over PostgreSQL money, which is locale-sensitive and harder to cast."
+
+  smallmoney:
+    compatible: ["numeric", "decimal"]
+    warn: ["money"]
+    note: "Prefer numeric(10,4) over PostgreSQL money."
+
+  float:
+    compatible: ["double precision", "float8"]
+    warn: ["numeric", "decimal", "real", "float4"]
+    note: "SQL Server float(53) maps to PostgreSQL double precision (float8)."
+
+  real:
+    compatible: ["real", "float4", "double precision", "float8"]
+    warn: ["numeric", "decimal"]
+    note: "SQL Server real maps to PostgreSQL real (float4) or double precision."
+
+  varchar:
+    compatible: ["character varying", "varchar", "text"]
+    warn: ["character", "char", "bpchar"]
+    note: "Map varchar(n) to varchar(n) or text; varchar(max) must map to text."
+
+  nvarchar:
+    compatible: ["character varying", "varchar", "text"]
+    warn: ["character", "char", "bpchar"]
+    note: "PostgreSQL UTF-8 databases natively store Unicode in varchar/text without N-prefixed types."
+
+  char:
+    compatible: ["character", "char", "bpchar", "character varying", "varchar", "text"]
+    warn: []
+    note: "Prefer varchar/text over fixed-length char unless blank-padding semantics are required."
+
+  nchar:
+    compatible: ["character", "char", "bpchar", "character varying", "varchar", "text"]
+    warn: []
+    note: "Map nchar(n) to char(n) or varchar(n) in UTF-8 PostgreSQL."
+
+  text:
+    compatible: ["text"]
+    warn: ["character varying", "varchar"]
+    note: "Map legacy SQL Server text to PostgreSQL text."
+
+  ntext:
+    compatible: ["text"]
+    warn: ["character varying", "varchar"]
+    note: "Map legacy SQL Server ntext to PostgreSQL text."
+
+  date:
+    compatible: ["date"]
+    warn: ["timestamp without time zone", "timestamp", "timestamp with time zone", "timestamptz"]
+    note: "Map date directly to PostgreSQL date."
+
+  time:
+    compatible: ["time", "time without time zone"]
+    warn: ["time with time zone", "timetz"]
+    note: "Map time to PostgreSQL time without time zone."
+
+  datetime:
+    compatible: ["timestamp without time zone", "timestamp", "timestamp with time zone", "timestamptz"]
+    warn: ["date"]
+    note: "Prefer timestamptz for UTC columns; verify timezone assumptions on legacy datetime."
+
+  datetime2:
+    compatible: ["timestamp without time zone", "timestamp", "timestamp with time zone", "timestamptz"]
+    warn: ["date"]
+    note: "PostgreSQL timestamps support microsecond (6) precision; datetime2(7) truncates 100ns ticks."
+
+  smalldatetime:
+    compatible: ["timestamp without time zone", "timestamp", "timestamp with time zone", "timestamptz"]
+    warn: ["date"]
+    note: "Map smalldatetime to timestamp or timestamptz."
+
+  datetimeoffset:
+    compatible: ["timestamp with time zone", "timestamptz"]
+    warn: ["timestamp without time zone", "timestamp"]
+    note: "Map datetimeoffset to timestamptz; stripping timezone offsets risks silent time shifts."
+
+  uniqueidentifier:
+    compatible: ["uuid"]
+    warn: ["character varying", "varchar", "text", "character", "char"]
+    note: "Map uniqueidentifier to native PostgreSQL uuid (16-byte binary storage, optimal indexing)."
+
+  varbinary:
+    compatible: ["bytea"]
+    warn: ["text"]
+    note: "Map varbinary to PostgreSQL bytea."
+
+  binary:
+    compatible: ["bytea"]
+    warn: ["text"]
+    note: "Map binary to PostgreSQL bytea."
+
+  image:
+    compatible: ["bytea"]
+    warn: ["text"]
+    note: "Map legacy SQL Server image BLOB type to PostgreSQL bytea."
+
+  rowversion:
+    compatible: ["bytea"]
+    warn: ["bigint", "int8"]
+    note: "SQL Server rowversion is an 8-byte binary concurrency token; map to bytea or explicit version bigint."
+
+  timestamp:
+    compatible: ["bytea"]
+    warn: ["bigint", "int8"]
+    note: "SQL Server timestamp is a deprecated synonym for 8-byte binary rowversion, NOT a calendar timestamp."
+
+  sysname:
+    compatible: ["character varying", "varchar", "text"]
+    warn: ["character", "char", "bpchar"]
+    note: "SQL Server sysname is an alias for nvarchar(128); map to varchar(128) or text."
+
+  xml:
+    compatible: ["xml"]
+    warn: ["text", "jsonb"]
+    note: "Map xml to PostgreSQL xml or text depending on XPath usage."
+
+  json:
+    compatible: ["jsonb", "json"]
+    warn: ["text"]
+    note: "Prefer PostgreSQL jsonb for indexed JSON workloads."

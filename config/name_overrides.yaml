@@ -1,0 +1,33 @@
+# Explicit Name Override Mapping for synthetic retail_demo migration
+#
+# Use overrides ONLY when an object was intentionally renamed during migration
+# or when two names collide after canonical-token normalization.
+# Standard acronym differences (e.g., SKUCode <-> sku_code, VATAmount <-> vat_amount)
+# are resolved automatically by canonical-token matching and DO NOT need overrides.
+
+version: "1.0"
+
+# Source MSSQL table name -> Target PostgreSQL table name
+table_overrides:
+  LegacyAuditLog: archive_audit_events
+
+# Keyed by Source MSSQL table name:
+#   Source MSSQL column name -> Target PostgreSQL column name
+column_overrides:
+  Payments:
+    PaymentRefCode: external_payment_ref
+
+# Source MSSQL routine name -> Target PostgreSQL routine name (or status metadata)
+routine_overrides:
+  usp_GetCustomerOrders: fn_get_customer_orders
+  usp_CalculateOrderVAT: fn_calculate_order_vat
+
+# Intentionally retired / app-migrated routines (suppresses FAIL -> logs PASS/INFO)
+routine_retirements:
+  usp_PurgeTempStaging:
+    status: replaced_by_app
+    reason: "Replaced by scheduled application worker during cutover."
+
+# Source MSSQL role/principal -> Target PostgreSQL role
+role_overrides:
+  db_datareader: bi_readonly

@@ -1,0 +1,194 @@
+{
+  "engine": "postgresql",
+  "server_name": "pg-target-01",
+  "database_name": "retail_demo",
+  "schema_name": "public",
+  "captured_at": "2026-02-15T02:00:04Z",
+  "capture_version": "1.0",
+  "tables": [
+    {
+      "name": "customers",
+      "schema_name": "public",
+      "columns": [
+        { "name": "customer_id", "data_type": "bigint", "is_nullable": false, "ordinal_position": 1, "is_identity": true },
+        { "name": "email_address", "data_type": "character varying", "max_length": 255, "is_nullable": true, "ordinal_position": 2 },
+        { "name": "full_name", "data_type": "character varying", "max_length": 150, "is_nullable": false, "ordinal_position": 3 },
+        { "name": "vat_number", "data_type": "character varying", "max_length": 32, "is_nullable": true, "ordinal_position": 4 },
+        { "name": "loyalty_tier", "data_type": "character varying", "max_length": 20, "is_nullable": false, "ordinal_position": 5, "default_value": "'STANDARD'" },
+        { "name": "created_at_utc", "data_type": "timestamp with time zone", "is_nullable": false, "ordinal_position": 6, "default_value": "now()" }
+      ],
+      "constraints": [
+        { "name": "customers_pkey", "constraint_type": "PRIMARY KEY", "columns": ["customer_id"] },
+        { "name": "customers_email_address_key", "constraint_type": "UNIQUE", "columns": ["email_address"] }
+      ],
+      "indexes": [
+        { "name": "customers_pkey", "columns": ["customer_id"], "is_unique": true, "is_primary": true, "index_type": "BTREE" }
+      ]
+    },
+    {
+      "name": "products",
+      "schema_name": "public",
+      "columns": [
+        { "name": "product_id", "data_type": "bigint", "is_nullable": false, "ordinal_position": 1, "is_identity": true },
+        { "name": "sku_code", "data_type": "character varying", "max_length": 64, "is_nullable": false, "ordinal_position": 2 },
+        { "name": "product_name", "data_type": "character varying", "max_length": 200, "is_nullable": false, "ordinal_position": 3 },
+        { "name": "unit_price", "data_type": "numeric", "numeric_precision": 18, "numeric_scale": 2, "is_nullable": false, "ordinal_position": 4 },
+        { "name": "stock_qty", "data_type": "integer", "is_nullable": false, "ordinal_position": 5 },
+        { "name": "is_active", "data_type": "boolean", "is_nullable": false, "ordinal_position": 6, "default_value": "true" }
+      ],
+      "constraints": [
+        { "name": "products_pkey", "constraint_type": "PRIMARY KEY", "columns": ["product_id"] },
+        { "name": "products_sku_code_key", "constraint_type": "UNIQUE", "columns": ["sku_code"] }
+      ],
+      "indexes": [
+        { "name": "products_pkey", "columns": ["product_id"], "is_unique": true, "is_primary": true, "index_type": "BTREE" }
+      ]
+    },
+    {
+      "name": "orders",
+      "schema_name": "public",
+      "columns": [
+        { "name": "order_id", "data_type": "bigint", "is_nullable": false, "ordinal_position": 1, "is_identity": true },
+        { "name": "customer_id", "data_type": "bigint", "is_nullable": false, "ordinal_position": 2 },
+        { "name": "order_date_utc", "data_type": "timestamp with time zone", "is_nullable": false, "ordinal_position": 3 },
+        { "name": "total_amount", "data_type": "numeric", "numeric_precision": 18, "numeric_scale": 2, "is_nullable": false, "ordinal_position": 4 },
+        { "name": "vat_amount", "data_type": "numeric", "numeric_precision": 18, "numeric_scale": 2, "is_nullable": false, "ordinal_position": 5 },
+        { "name": "order_status", "data_type": "character varying", "max_length": 30, "is_nullable": false, "ordinal_position": 6 },
+        { "name": "promo_chnl_cd", "data_type": "character varying", "max_length": 32, "is_nullable": true, "ordinal_position": 7 }
+      ],
+      "constraints": [
+        { "name": "orders_pkey", "constraint_type": "PRIMARY KEY", "columns": ["order_id"] },
+        { "name": "orders_customer_id_fkey", "constraint_type": "FOREIGN KEY", "columns": ["customer_id"], "referenced_table": "customers", "referenced_columns": ["customer_id"] }
+      ],
+      "indexes": [
+        { "name": "orders_pkey", "columns": ["order_id"], "is_unique": true, "is_primary": true, "index_type": "BTREE" }
+      ]
+    },
+    {
+      "name": "order_items",
+      "schema_name": "public",
+      "columns": [
+        { "name": "order_item_id", "data_type": "bigint", "is_nullable": false, "ordinal_position": 1, "is_identity": true },
+        { "name": "order_id", "data_type": "bigint", "is_nullable": false, "ordinal_position": 2 },
+        { "name": "product_id", "data_type": "bigint", "is_nullable": false, "ordinal_position": 3 },
+        { "name": "quantity", "data_type": "integer", "is_nullable": false, "ordinal_position": 4 },
+        { "name": "line_amount", "data_type": "numeric", "numeric_precision": 18, "numeric_scale": 2, "is_nullable": false, "ordinal_position": 5 }
+      ],
+      "constraints": [
+        { "name": "order_items_pkey", "constraint_type": "PRIMARY KEY", "columns": ["order_item_id"] },
+        { "name": "order_items_order_id_fkey", "constraint_type": "FOREIGN KEY", "columns": ["order_id"], "referenced_table": "orders", "referenced_columns": ["order_id"] },
+        { "name": "order_items_product_id_fkey", "constraint_type": "FOREIGN KEY", "columns": ["product_id"], "referenced_table": "products", "referenced_columns": ["product_id"] }
+      ],
+      "indexes": [
+        { "name": "order_items_pkey", "columns": ["order_item_id"], "is_unique": true, "is_primary": true, "index_type": "BTREE" },
+        { "name": "idx_order_items_order_id", "columns": ["order_id"], "is_unique": false, "is_primary": false, "index_type": "BTREE" }
+      ]
+    },
+    {
+      "name": "payments",
+      "schema_name": "public",
+      "columns": [
+        { "name": "payment_id", "data_type": "bigint", "is_nullable": false, "ordinal_position": 1, "is_identity": true },
+        { "name": "order_id", "data_type": "bigint", "is_nullable": false, "ordinal_position": 2 },
+        { "name": "external_payment_ref", "data_type": "character varying", "max_length": 64, "is_nullable": false, "ordinal_position": 3 },
+        { "name": "paid_amount", "data_type": "numeric", "numeric_precision": 18, "numeric_scale": 2, "is_nullable": false, "ordinal_position": 4 },
+        { "name": "paid_at_utc", "data_type": "timestamp with time zone", "is_nullable": false, "ordinal_position": 5 },
+        { "name": "payment_method", "data_type": "character varying", "max_length": 32, "is_nullable": false, "ordinal_position": 6 }
+      ],
+      "constraints": [
+        { "name": "payments_pkey", "constraint_type": "PRIMARY KEY", "columns": ["payment_id"] },
+        { "name": "payments_order_id_fkey", "constraint_type": "FOREIGN KEY", "columns": ["order_id"], "referenced_table": "orders", "referenced_columns": ["order_id"] },
+        { "name": "payments_external_payment_ref_key", "constraint_type": "UNIQUE", "columns": ["external_payment_ref"] }
+      ],
+      "indexes": [
+        { "name": "payments_pkey", "columns": ["payment_id"], "is_unique": true, "is_primary": true, "index_type": "BTREE" }
+      ]
+    },
+    {
+      "name": "archive_audit_events",
+      "schema_name": "public",
+      "columns": [
+        { "name": "audit_event_id", "data_type": "bigint", "is_nullable": false, "ordinal_position": 1, "is_identity": true },
+        { "name": "entity_name", "data_type": "character varying", "max_length": 64, "is_nullable": false, "ordinal_position": 2 },
+        { "name": "event_payload", "data_type": "text", "is_nullable": true, "ordinal_position": 3 },
+        { "name": "logged_at_utc", "data_type": "timestamp with time zone", "is_nullable": false, "ordinal_position": 4 }
+      ],
+      "constraints": [
+        { "name": "archive_audit_events_pkey", "constraint_type": "PRIMARY KEY", "columns": ["audit_event_id"] }
+      ],
+      "indexes": [
+        { "name": "archive_audit_events_pkey", "columns": ["audit_event_id"], "is_unique": true, "is_primary": true, "index_type": "BTREE" }
+      ]
+    }
+  ],
+  "routines": [
+    { "name": "fn_get_customer_orders", "schema_name": "public", "routine_type": "FUNCTION", "parameter_count": 1, "return_type": "table" },
+    { "name": "fn_calculate_order_vat", "schema_name": "public", "routine_type": "FUNCTION", "parameter_count": 2, "return_type": "numeric" }
+  ],
+  "security_grants": [
+    { "principal": "app_retail_rw", "object_type": "TABLE", "object_name": "customers", "privilege": "SELECT" },
+    { "principal": "app_retail_rw", "object_type": "TABLE", "object_name": "customers", "privilege": "INSERT" },
+    { "principal": "app_retail_rw", "object_type": "TABLE", "object_name": "customers", "privilege": "UPDATE" },
+    { "principal": "app_retail_rw", "object_type": "TABLE", "object_name": "orders", "privilege": "SELECT" },
+    { "principal": "app_retail_rw", "object_type": "TABLE", "object_name": "orders", "privilege": "INSERT" },
+    { "principal": "app_retail_rw", "object_type": "TABLE", "object_name": "orders", "privilege": "UPDATE" },
+    { "principal": "app_retail_rw", "object_type": "TABLE", "object_name": "payments", "privilege": "ALL PRIVILEGES" },
+    { "principal": "bi_readonly", "object_type": "TABLE", "object_name": "orders", "privilege": "SELECT" },
+    { "principal": "bi_readonly", "object_type": "TABLE", "object_name": "order_items", "privilege": "SELECT" },
+    { "principal": "app_retail_rw", "object_type": "ROUTINE", "object_name": "fn_get_customer_orders", "privilege": "EXECUTE" },
+    { "principal": "PUBLIC", "object_type": "TABLE", "object_name": "customers", "privilege": "SELECT" }
+  ],
+  "data_stats": [
+    {
+      "table_name": "customers",
+      "row_count": 4,
+      "aggregate_checksum": "a1b2c3d4e5f60001",
+      "column_aggregates": [
+        { "column_name": "customer_id", "sum_value": "10", "min_value": "1", "max_value": "4", "null_count": 0 }
+      ]
+    },
+    {
+      "table_name": "products",
+      "row_count": 4,
+      "aggregate_checksum": "a1b2c3d4e5f60002",
+      "column_aggregates": [
+        { "column_name": "unit_price", "sum_value": "610.50", "min_value": "45.50", "max_value": "380.00", "null_count": 0 },
+        { "column_name": "stock_qty", "sum_value": "285", "min_value": "30", "max_value": "120", "null_count": 0 }
+      ]
+    },
+    {
+      "table_name": "orders",
+      "row_count": 4,
+      "aggregate_checksum": "a1b2c3d4e5f60003",
+      "column_aggregates": [
+        { "column_name": "total_amount", "sum_value": "875.05", "min_value": "132.00", "max_value": "418.00", "null_count": 0 },
+        { "column_name": "vat_amount", "sum_value": "79.55", "min_value": "12.00", "max_value": "38.00", "null_count": 0 }
+      ]
+    },
+    {
+      "table_name": "order_items",
+      "row_count": 5,
+      "aggregate_checksum": "a1b2c3d4e5f60004",
+      "column_aggregates": [
+        { "column_name": "quantity", "sum_value": "6", "min_value": "1", "max_value": "2", "null_count": 0 },
+        { "column_name": "line_amount", "sum_value": "795.50", "min_value": "45.50", "max_value": "380.00", "null_count": 0 }
+      ]
+    },
+    {
+      "table_name": "payments",
+      "row_count": 3,
+      "aggregate_checksum": "deadbeef00000005",
+      "column_aggregates": [
+        { "column_name": "paid_amount", "sum_value": "743.05", "min_value": "143.00", "max_value": "418.00", "null_count": 0 }
+      ]
+    },
+    {
+      "table_name": "archive_audit_events",
+      "row_count": 2,
+      "aggregate_checksum": "a1b2c3d4e5f60006",
+      "column_aggregates": [
+        { "column_name": "audit_event_id", "sum_value": "3", "min_value": "1", "max_value": "2", "null_count": 0 }
+      ]
+    }
+  ]
+}

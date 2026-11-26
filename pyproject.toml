@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mssql-to-pg-parity-kit"
+version = "1.0.0"
+description = "Immutable-snapshot heterogeneous database migration parity and audit framework (SQL Server to PostgreSQL)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Database Reliability Engineering Portfolio"}
+]
+dependencies = [
+    "PyYAML>=6.0.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "sqlglot>=25.0.0",
+]
+
+[project.scripts]
+parity-kit = "src.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v --tb=short"

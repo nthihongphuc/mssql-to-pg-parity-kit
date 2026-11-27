@@ -1,5 +1,15 @@
 # mssql-to-pg-parity-kit
 
+[![CI](https://github.com/nthihongphuc/mssql-to-pg-parity-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/nthihongphuc/mssql-to-pg-parity-kit/actions/workflows/ci.yml)
+![SQL Server 2022](https://img.shields.io/badge/SQL%20Server-2022-CC2927?style=flat-square&logo=microsoftsqlserver&logoColor=white)
+![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white)
+![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
+![sqlglot AST](https://img.shields.io/badge/sqlglot-AST%20Guard-0D9488?style=flat-square)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white)
+[![License: MIT](https://img.shields.io/badge/License-MIT-2EA44F?style=flat-square)](./LICENSE)
+
+[Architecture](#architecture) • [Five-Layer Parity Model](#five-layer-parity-model) • [Quickstart](#quickstart) • [Verification](#sample-drift-report-output) • [License](#license)
+
 **Heterogeneous Database Migration Parity & Audit Framework (SQL Server to PostgreSQL)** built on an **Immutable Snapshot** architecture.
 
 Captures a single read-only point-in-time snapshot from source SQL Server and target PostgreSQL instances, executes deterministic multi-layer verification offline (zero recurring load on production OLTP), and produces both an actionable Markdown drift report and a transactional PostgreSQL audit trail (`migration_audit`).
@@ -276,3 +286,10 @@ Key drift findings surfaced automatically with copy-pasteable remediation SQL:
 - **Asymmetric Nullability Severity:** Loosening `NOT NULL -> NULL` on target is a `FAIL` (data integrity regression), whereas tightening `NULL -> NOT NULL` is a `WARN` (ETL load hazard if historical NULLs exist).
 - **Safe Quoted DDL & Verified Audit Trail Alignment:** Remediation SQL (`CREATE INDEX CONCURRENTLY`, `ALTER TABLE`, `GRANT`/`REVOKE`) double-quotes PostgreSQL identifiers safely, and `render_audit_sql` validates UUIDs, escapes single quotes (`'` -> `''`) across text and JSONB literals, and is AST-tested with `sqlglot` for 100% column and `NOT NULL`/FK alignment against `sql/migration_audit_schema.sql`.
 - **Exact-Match Admin Allowlist & Partial Index on Active Drift:** Security checks use an exact canonical admin allowlist (preventing substring bypasses such as `app_postgres_worker`), and `migration_audit.check_result` defines a partial index (`WHERE status IN ('FAIL', 'WARN')`) so cutover dashboards remain sub-millisecond across historical rehearsal runs.
+
+---
+
+## License
+
+Licensed under the [MIT License](./LICENSE).
+

@@ -119,16 +119,65 @@ Layer 1 (`src/comparators/naming.py`) resolves heterogeneous object names throug
 
 ---
 
-## Read-Only Snapshot Query Catalog (`src/snapshot/queries.py`)
+## Read-Only Live Snapshot Capture Engine (`src/snapshot/capturer.py` & `queries.py`)
 
-To back the immutable snapshot JSON format with real production metadata extraction, [`src/snapshot/queries.py`](src/snapshot/queries.py) ships 13 parameterized, strictly read-only catalog queries verified in CI by a `sqlglot` AST guardrail (`validate_read_only_sql`):
+To back the immutable snapshot JSON format with real production metadata extraction, [`src/snapshot/queries.py`](src/snapshot/queries.py) ships 13 parameterized, strictly read-only catalog queries executed by [`src/snapshot/capturer.py`](src/snapshot/capturer.py) under a multi-layer read-only safety architecture:
 
-| Engine | System Catalogs & DMVs | DBA Hardening Details |
+| Engine | System Catalogs & DMVs | Read-Only Session & DBA Hardening Guarantees |
 | :--- | :--- | :--- |
-| **SQL Server (`tsql`)** | `sys.tables`, `sys.columns`, `sys.key_constraints`, `sys.foreign_keys`, `sys.indexes`, `sys.index_columns`, `sys.objects`, `sys.database_permissions`, `sys.dm_db_partition_stats` | Converts `NVARCHAR`/`NCHAR` UTF-16 byte length (`c.max_length / 2`) while preserving `-1` for `(MAX)`; uses `sys.dm_db_partition_stats` (`index_id IN (0, 1)`) for zero-scan row counts; parameterized with `@schema_name`. |
-| **PostgreSQL (`postgres`)** | `pg_class`, `pg_attribute`, `pg_constraint`, `pg_index`, `pg_proc`, `information_schema.role_table_grants`, `information_schema.role_routine_grants`, `pg_roles`, `pg_stat_user_tables` | Supports ordinary & partitioned tables (`relkind IN ('r', 'p')`); filters out invalid/unready `CONCURRENTLY` indexes (`indisvalid AND indisready`); distinguishes key vs `INCLUDE` columns via `indnkeyatts`; parameterized with `$1`. |
+| **SQL Server (`tsql`)** | `sys.tables`, `sys.columns`, `sys.key_constraints`, `sys.foreign_keys`, `sys.indexes`, `sys.index_columns`, `sys.objects`, `sys.database_permissions`, `sys.dm_db_partition_stats` | Enforces `ApplicationIntent=ReadOnly` in connection strings, ODBC `readonly=True`, `SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED`, `SET LOCK_TIMEOUT 5000`, unconditional `ROLLBACK` on close, `NVARCHAR`/`NCHAR` UTF-16 byte-to-char length normalization (`c.max_length / 2`, `-1` for `MAX`), and safe `[identifier]` bracket quoting on numeric aggregates. |
+| **PostgreSQL (`postgres`)** | `pg_class`, `pg_attribute`, `pg_constraint`, `pg_index`, `pg_proc`, `information_schema.role_table_grants`, `information_schema.role_routine_grants`, `pg_roles`, `pg_stat_user_tables` | Runs inside an explicit `BEGIN TRANSACTION READ ONLY; SET LOCAL statement_timeout = '15s'; ... ROLLBACK;` block; auto-detects `psycopg` (v3), `psycopg2`, or zero-C-extension `psql` CLI subprocess; filters out invalid `CONCURRENTLY` indexes (`indisvalid AND indisready`); distinguishes key vs `INCLUDE` columns (`indnkeyatts`); double-quotes identifiers via `pg_quote_ident`. |
 
-Every query is statically guarded by `sqlglot` AST traversal to reject stacked queries, mutating statements, PostgreSQL writable CTEs (`WITH ... DELETE/UPDATE`), `SELECT INTO`, and row-locking clauses (`FOR UPDATE` / `FOR SHARE`).
+Every catalog query and dynamically generated table aggregate query (`COUNT(*)`, `SUM`, `MIN`, `MAX`, `NULL` counts) is statically verified by `validate_read_only_sql(...)` (`sqlglot` AST traversal) **immediately before execution**, rejecting stacked queries, mutating DML/DDL/DCL statements, PostgreSQL writable CTEs (`WITH ... DELETE/UPDATE`), `SELECT INTO`, and row-locking clauses (`FOR UPDATE` / `FOR SHARE`).
+
+### Live Snapshot Capture CLI (`cli capture`)
+
+Prefer `--dsn-env` over `--dsn` so database credentials never appear in shell history, process lists, or CLI output:
+
+```bash
+# Capture PostgreSQL snapshot (full metadata + exact row counts & numeric aggregates)
+export PG_CAPTURE_DSN="postgresql://readonly_audit:CHANGE_ME@127.0.0.1:5432/retail_demo"
+python -m src.cli capture \
+  --engine postgres \
+  --dsn-env PG_CAPTURE_DSN \
+  --schema public \
+  --server pg-target-01 \
+  --database retail_demo \
+  --out snapshots/pg/snapshot.json
+
+# Metadata-only capture (zero table scans)
+python -m src.cli capture \
+  --engine postgres \
+  --dsn-env PG_CAPTURE_DSN \
+  --schema public \
+  --server pg-target-01 \
+  --database retail_demo \
+  --skip-data-stats \
+  --out snapshots/pg/snapshot_meta.json
+
+# Capture SQL Server snapshot (ApplicationIntent=ReadOnly enforced automatically)
+export MSSQL_CAPTURE_DSN="Driver={ODBC Driver 18 for SQL Server};Server=127.0.0.1,1433;Database=retail_demo;UID=readonly_audit;PWD=CHANGE_ME;Encrypt=yes;"
+python -m src.cli capture \
+  --engine mssql \
+  --dsn-env MSSQL_CAPTURE_DSN \
+  --schema dbo \
+  --server sql-src-01 \
+  --database retail_demo \
+  --out snapshots/mssql/snapshot.json
+```
+
+### Live PostgreSQL 16 Verification Benchmark (`demo/pg_init.sql`)
+
+Measured end-to-end against a live Docker PostgreSQL 16 instance seeded with [`demo/pg_init.sql`](demo/pg_init.sql) (`ANALYZE;` completed) via `python -m src.cli capture --engine postgres --dsn-env PG_CAPTURE_DSN`:
+
+| Metric | Live PG16 Measured Result |
+| :--- | :--- |
+| **Full Capture Latency** (metadata + exact `COUNT(*)` / `SUM` / `MIN` / `MAX` / `NULL`s) | **210.7 ms** |
+| **Metadata-Only Capture Latency** (`--skip-data-stats`, zero table scans) | **180.5 ms** |
+| **Captured Schema & Security Objects** | `6` tables, `34` columns, `13` constraints, `10` indexes, `2` functions, `63` catalog grant rows |
+| **Captured Data Statistics** | `6` table stats covering `17` numeric column aggregates |
+| **Server-Verified Read-Only Guard** | `SHOW transaction_read_only = on`, `SHOW statement_timeout = 15s`, DDL blocked (`ReadOnlySqlTransaction`) |
+| **End-to-End Pipeline (`capture -> validate -> compare`)** | Validated cleanly (`0` schema errors); 5-layer comparison against `fixtures/retail_demo_run/mssql/snapshot.json` evaluated `132` checks (`113 PASS`, `13 WARN`, `6 FAIL`), detecting every intentional drift across Layers 1–5 |
 
 ---
 
@@ -165,7 +214,8 @@ mssql-to-pg-parity-kit/
 │   ├── snapshot/
 │   │   ├── models.py              # Frozen typed dataclasses for snapshots & check results
 │   │   ├── loader.py              # JSON snapshot validation & YAML config loaders
-│   │   └── queries.py             # Read-only MSSQL & PostgreSQL catalog queries + AST guard
+│   │   ├── queries.py             # Read-only MSSQL & PostgreSQL catalog queries + AST guard
+│   │   └── capturer.py            # Live read-only PG/MSSQL snapshot capturer + JSON writer
 │   ├── comparators/
 │   │   ├── naming.py              # Canonical-token matcher, collision detector & type checker
 │   │   ├── structure.py           # Table, column, type, nullability, constraint & index parity
@@ -173,8 +223,9 @@ mssql-to-pg-parity-kit/
 │   │   ├── routines.py            # Procedure/function migration & retirement inventory
 │   │   └── security.py            # Grant parity & PostgreSQL least-privilege guardrails
 │   ├── report.py                  # Markdown drift report + PostgreSQL audit SQL renderer
-│   └── cli.py                     # CLI entrypoint (compare & validate subcommands)
+│   └── cli.py                     # CLI entrypoint (capture, validate & compare subcommands)
 ├── tests/
+│   ├── test_capturer.py           # Read-only AST guard, PG/MSSQL mock capture & CLI capture tests
 │   ├── test_naming.py
 │   ├── test_structure.py
 │   ├── test_data_routines_security.py

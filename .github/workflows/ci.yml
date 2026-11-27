@@ -28,8 +28,11 @@ jobs:
       - name: Run Pytest suite
         run: python -m pytest -v
 
-      - name: Validate offline snapshot fixture
-        run: python -m src.cli validate --snapshot-dir fixtures/retail_demo_run
+      - name: Verify capture CLI help and offline snapshot validation
+        run: |
+          python -m src.cli capture --help
+          python -m src.cli validate --snapshot-dir fixtures/retail_demo_run
+          python -m src.cli validate --snapshot-file fixtures/retail_demo_run/pg/snapshot.json
 
       - name: Run 5-layer offline parity comparison
         run: >-
